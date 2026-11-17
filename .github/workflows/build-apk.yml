@@ -68,7 +68,10 @@ jobs:
       run: |
         cd android
         chmod +x gradlew
-        ./gradlew assembleDebug
+        # Bozuk önbellek kilitlerini ve eski build artiklarini temizle
+        ./gradlew clean
+        # Derlemeyi tek iş parçacığıyla (parallel kapalı) ve taze cache ile çalıştır
+        ./gradlew assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
