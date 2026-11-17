@@ -24,7 +24,7 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Prepare Live TV Project and Capacitor
+    - name: Find and Prepare Live TV Files
       run: |
         # package.json yoksa olustur
         if [ ! -f package.json ]; then
@@ -34,20 +34,29 @@ jobs:
         # Capacitor paketlerini kur
         npm install @capacitor/core @capacitor/cli @capacitor/android
         
-        # www klasorunu olustur ve Canlı TV web dosyalarini hazirla
+        # www klasorunu olustur
         mkdir -p www
         
-        if [ -f index.html ]; then
-          cp index.html www/
+        # index.html dosyasini ana dizinde veya alt klasorlerde otomatik ara
+        echo "index.html aranıyor..."
+        found_index=$(find . -maxdepth 3 -name "index.html" -not -path "*/node_modules/*" -not -path "*/android/*" -not -path "*/www/*" | head -n 1)
+        
+        if [ -n "$found_index" ]; then
+          echo "Bulundu ve kopyalandı: $found_index -> www/index.html"
+          cp "$found_index" www/index.html
         else
-          echo "HATA: index.html bulunamadi! Lutfen Canli TV ana dosyanizi kok dizine ekleyin."
+          echo "HATA: Depoda hiçbir yerde index.html dosyası bulunamadı!"
           exit 1
         fi
         
-        # Varsa diger CSS ve JS dosyalarini kopyala
-        cp -r *.css www/ 2>/dev/null || true
-        cp -r *.js www/ 2>/dev/null || true
-        cp -r assets www/ 2>/dev/null || true
+        # Varsa diger CSS ve JS dosyalarini alt klasorlerden bulup kopyala
+        for file in style.css app.js engine.js rhythms.js; do
+          found_file=$(find . -maxdepth 3 -name "$file" -not -path "*/node_modules/*" -not -path "*/android/*" -not -path "*/www/*" | head -n 1)
+          if [ -n "$found_file" ]; then
+            echo "Bulundu ve kopyalandı: $found_file -> www/"
+            cp "$found_file" www/
+          fi
+        done
         
         # Capacitor yapilandirma dosyasini olustur
         cat << 'EOF' > capacitor.config.json
@@ -67,11 +76,14 @@ jobs:
       run: |
         cd android
         chmod +x gradlew
-        # Bozuk önbellek dosyalarını ve kilitlenmeleri temizle
-        rm -rf .gradle/caches/
+        
+        # KRİTİK DÜZELTME: Bozuk jar ve önbellek kilitlerini tamamen temizle
+        rm -rf ~/.gradle/caches/
+        rm -rf ~/.gradle/daemon/
+        
+        # Gradle derlemesini daemon olmadan ve taze önbellekle çalıştır
         ./gradlew clean
-        # Çakışmaları önlemek için daemon olmadan derle
-        ./gradlew assembleDebug --no-daemon --stacktrace
+        ./gradlew assembleDebug --no-daemon --refresh-dependencies --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
