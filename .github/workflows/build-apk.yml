@@ -1,4 +1,4 @@
-name: Build APK from Web Files
+name: Build Türkiye Canlı TV APK
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Find and Prepare Web Files
+    - name: Prepare Live TV Project and Capacitor
       run: |
         # package.json yoksa olustur
         if [ ! -f package.json ]; then
@@ -34,21 +34,20 @@ jobs:
         # Capacitor paketlerini kur
         npm install @capacitor/core @capacitor/cli @capacitor/android
         
-        # www klasorunu olustur
+        # www klasorunu olustur ve Canlı TV web dosyalarini hazirla
         mkdir -p www
         
-        # Proje icinde dosyalari arayip www klasorune tasiyan dongu
-        echo "Web dosyalari araniyor ve kopyalaniyor..."
+        if [ -f index.html ]; then
+          cp index.html www/
+        else
+          echo "HATA: index.html bulunamadi! Lutfen Canli TV ana dosyanizi kok dizine ekleyin."
+          exit 1
+        fi
         
-        for file in index.html style.css app.js engine.js rhythms.js; do
-          found_file=$(find . -maxdepth 3 -name "$file" -not -path "*/node_modules/*" -not -path "*/android/*" -not -path "*/www/*" | head -n 1)
-          if [ -n "$found_file" ]; then
-            echo "Bulundu ve kopyalandi: $found_file -> www/$file"
-            cp "$found_file" www/
-          else
-            echo "UYARI: $file dosyasi bulunamadi!"
-          fi
-        done
+        # Varsa diger CSS ve JS dosyalarini kopyala
+        cp -r *.css www/ 2>/dev/null || true
+        cp -r *.js www/ 2>/dev/null || true
+        cp -r assets www/ 2>/dev/null || true
         
         # Capacitor yapilandirma dosyasini olustur
         cat << 'EOF' > capacitor.config.json
@@ -68,13 +67,14 @@ jobs:
       run: |
         cd android
         chmod +x gradlew
-        # Bozuk önbellek kilitlerini ve eski build artiklarini temizle
+        # Bozuk önbellek dosyalarını ve kilitlenmeleri temizle
+        rm -rf .gradle/caches/
         ./gradlew clean
-        # Derlemeyi tek iş parçacığıyla (parallel kapalı) ve taze cache ile çalıştır
+        # Çakışmaları önlemek için daemon olmadan derle
         ./gradlew assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
+        name: turkiye-canli-tv-debug
         path: android/app/build/outputs/apk/debug/app-debug.apk
