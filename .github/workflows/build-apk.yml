@@ -14,7 +14,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Node.js
-      uses: setup-node@v4
+      uses: actions/setup-node@v4
       with:
         node-version: 18
 
@@ -24,7 +24,7 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Prepare Project and Capacitor
+    - name: Find and Prepare Web Files
       run: |
         # package.json yoksa olustur
         if [ ! -f package.json ]; then
@@ -34,19 +34,27 @@ jobs:
         # Capacitor paketlerini kur
         npm install @capacitor/core @capacitor/cli @capacitor/android
         
-        # Yuklediginiz web dosyalarini Capacitor'un bekledigi 'www' klasorune tasi
+        # www klasorunu olustur
         mkdir -p www
-        cp index.html www/
-        cp style.css www/
-        cp app.js www/
-        cp engine.js www/
-        cp rhythms.js www/
+        
+        # Proje icinde dosyalari arayip www klasorune tasiyan dongu
+        echo "Web dosyalari araniyor ve kopyalaniyor..."
+        
+        for file in index.html style.css app.js engine.js rhythms.js; do
+          found_file=$(find . -maxdepth 3 -name "$file" -not -path "*/node_modules/*" -not -path "*/android/*" -not -path "*/www/*" | head -n 1)
+          if [ -n "$found_file" ]; then
+            echo "Bulundu ve kopyalandi: $found_file -> www/$file"
+            cp "$found_file" www/
+          else
+            echo "UYARI: $file dosyasi bulunamadi!"
+          fi
+        done
         
         # Capacitor yapilandirma dosyasini olustur
         cat << 'EOF' > capacitor.config.json
         {
-          "appId": "com.proje.app",
-          "appName": "Web App",
+          "appId": "com.turkiyecanlitv.app",
+          "appName": "Türkiye Canlı TV",
           "webDir": "www",
           "bundledWebRuntime": false
         }
